@@ -100,7 +100,7 @@ module ip_w_ctrl #(
   initial begin:init_weights
     logic [DAT_W-1:0] wval;
     for (int n=0; n<NUM_W_MATRICES; n++) begin:gn
-      wval = 'd1;
+      wval = 'd22;
       for (int r=0; r<WM_ROWS; r++) begin:gr
         for (int c=0; c<WM_COLS; c++) begin:gc
           gen_weights[n][c][r] = wval;

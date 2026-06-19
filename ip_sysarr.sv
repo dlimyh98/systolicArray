@@ -22,8 +22,8 @@ module ip_sysarr #(
   wire             grd_a_v [0:X_DIM-1][0:Y_DIM-1];
 
   // comp interconnect
-  //FIXME: magic 9 to account for accumulative C
-  wire [9:0] grd_p_carr_n [0:X_DIM-1][0:Y_DIM-1];
+  localparam MAX_PSUM_W = (DAT_W*2) + (Y_DIM-1);
+  wire [MAX_PSUM_W-1:0] grd_p_carr_n [0:X_DIM-1][0:Y_DIM-1];
 
   genvar x,y;
   generate

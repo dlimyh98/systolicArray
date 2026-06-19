@@ -60,7 +60,7 @@ module ip_a_ctrl #(
   initial begin:init_activations
     logic [DAT_W-1:0] aval;
     for (int n=0; n<NUM_A_MATRICES; n++) begin:gn
-      aval = 'd1;
+      aval = 'd12;
       for (int r=0; r<AM_ROWS; r++) begin:gr
         for (int c=0; c<AM_COLS; c++) begin:gc
           gen_activation[n][c][r] = aval;
