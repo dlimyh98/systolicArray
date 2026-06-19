@@ -12,18 +12,21 @@ module ip_sysarr #(
   localparam DAT_W = ext_w[0].DAT_W;
   localparam CRD_N = ext_w[0].CRD_N;
 
+  //NB: dimensions [XDIM][Y_DIM] of interconnects are unused. they
+  //are added to work around a vrltr issue with oob-driver, under gy_int/gx_int loop
+
   // weight {d,c,v} interconnect
-  wire [DAT_W-1:0] grd_w_d [0:X_DIM-1][0:Y_DIM-1];
-  wire [CRD_N-1:0] grd_w_c [0:X_DIM-1][0:Y_DIM-1];
-  wire             grd_w_v [0:X_DIM-1][0:Y_DIM-1];
+  wire [DAT_W-1:0] grd_w_d [0:X_DIM][0:Y_DIM];
+  wire [CRD_N-1:0] grd_w_c [0:X_DIM][0:Y_DIM];
+  wire             grd_w_v [0:X_DIM][0:Y_DIM];
 
   // activation {d,v} interconnect
-  wire [DAT_W-1:0] grd_a_d [0:X_DIM-1][0:Y_DIM-1];
-  wire             grd_a_v [0:X_DIM-1][0:Y_DIM-1];
+  wire [DAT_W-1:0] grd_a_d [0:X_DIM][0:Y_DIM];
+  wire             grd_a_v [0:X_DIM][0:Y_DIM];
 
   // comp interconnect
   localparam MAX_PSUM_W = (DAT_W*2) + (Y_DIM-1);
-  wire [MAX_PSUM_W-1:0] grd_p_carr_n [0:X_DIM-1][0:Y_DIM-1];
+  wire [MAX_PSUM_W-1:0] grd_p_carr_n [0:X_DIM][0:Y_DIM];
 
   genvar x,y;
   generate

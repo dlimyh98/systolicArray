@@ -19,8 +19,13 @@ module ip_w_ctrl #(
 
   // pointers across X_DIM of systolic array (weights travel north-south)
   // each pointer holds reference to value(s) of the weight matrix
-  logic [$clog2(NUM_W_MATRICES)-1:0] nptr [0:X_DIM-1], nptr_n;
-  logic [$clog2(WM_ROWS)-1:0] rptr [0:X_DIM-1], rptr_n; // row pointer
+  localparam NPTR_W = (NUM_W_MATRICES > 1) ? $clog2(NUM_W_MATRICES) : 1;
+  localparam RPTR_W = (WM_ROWS > 1) ? $clog2(WM_ROWS) : 1;
+  typedef logic [NPTR_W-1:0] nptr_t;
+  typedef logic [RPTR_W-1:0] rptr_t;
+
+  nptr_t nptr [0:X_DIM-1], nptr_n;
+  rptr_t rptr [0:X_DIM-1], rptr_n; // row pointer
 
   typedef enum logic [1:0] {
     S_I, // idle
@@ -64,7 +69,7 @@ module ip_w_ctrl #(
   always_ff @(posedge clk) begin:ff_ctrl
     if (!rstn) begin:rst
       nptr[0] <= '0;
-      rptr[0] <= WM_ROWS-1;
+      rptr[0] <= rptr_t'(WM_ROWS-1);
     end:rst
     else begin:nrst
       nptr[0] <= nptr_n;
@@ -77,7 +82,7 @@ module ip_w_ctrl #(
     nptr_n = nptr[0];
 
     if (rptr[0] == 0) begin
-      rptr_n = (WM_ROWS-1);
+      rptr_n = rptr_t'(WM_ROWS-1);
       nptr_n = nptr[0] + 'd1;
     end
   end:cb_ctrl

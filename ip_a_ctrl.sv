@@ -18,8 +18,12 @@ module ip_a_ctrl #(
 
   // pointers across Y_DIM of systolic array (activation travels west-east)
   // each pointer holds reference to value(s) of the activation matrix
-  logic [$clog2(NUM_A_MATRICES)-1:0] nptr [0:Y_DIM-1], nptr_n;
-  logic [$clog2(AM_ROWS)-1:0] rptr [0:Y_DIM-1], rptr_n; // row pointer
+  localparam NPTR_W = (NUM_A_MATRICES > 1) ? $clog2(NUM_A_MATRICES) : 1;
+  localparam RPTR_W = (AM_ROWS > 1) ? $clog2(AM_ROWS) : 1;
+  typedef logic [NPTR_W-1:0] nptr_t;
+  typedef logic [RPTR_W-1:0] rptr_t;
+  nptr_t nptr [0:Y_DIM-1], nptr_n;
+  rptr_t rptr [0:Y_DIM-1], rptr_n; // row pointer
 
   // ext_a[0], increment along the matrix 0th column (top-down)
   // ext_a[1], increment along the matrix 1st column (top-down)
@@ -38,7 +42,7 @@ module ip_a_ctrl #(
     rptr_n = (ssa) ? rptr[0] + 'd1 : rptr[0];
     nptr_n = nptr[0];
 
-    if (rptr[0] == AM_ROWS-1) begin
+    if (rptr[0] == rptr_t'(AM_ROWS-1)) begin
       rptr_n = '0;
       nptr_n = nptr[0] + 'd1;
     end
