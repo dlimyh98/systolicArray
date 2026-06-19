@@ -1,0 +1,89 @@
+// vim: set ts=2 sw=2 et :
+
+module ip_w_ctrl #(
+  parameter WM_ROWS,
+  parameter WM_COLS,
+  parameter Y_DIM,
+  localparam X_DIM = WM_COLS,
+  parameter ZZZ    = 0
+) (
+  weight_if.ct ext_w[0:X_DIM-1],
+  input clk,
+  input rstn,
+  output logic ssa // start streaming activation data
+);
+
+  localparam DAT_W = ext_w[0].DAT_W;
+  localparam NUM_W_MATRICES = 2;
+  logic [DAT_W-1:0] gen_weights [0:NUM_W_MATRICES-1][0:WM_COLS-1][0:WM_ROWS-1];
+
+  // pointers across X_DIM of systolic array (weights travel north-south)
+  // each pointer holds reference to value(s) of the weight matrix
+  logic [$clog2(NUM_W_MATRICES)-1:0] nptr [0:X_DIM-1], nptr_n;
+  logic [$clog2(WM_ROWS)-1:0] rptr [0:X_DIM-1], rptr_n; // row pointer
+
+  //FIXME: don't like this, has to be better way
+  logic vld;
+  always_ff @(posedge clk) vld <= rstn;
+
+  // signal to ip_a_ctrl to begin streaming activation data
+  // the latency is a function of the systolic array's Y_DIM
+  logic [Y_DIM-1:0] ssa_d;
+  for (genvar y=0; y<Y_DIM; y++) begin:gen_ssa
+    always_ff @(posedge clk) begin
+      if (!rstn) ssa_d[y] <= '0;
+      else       ssa_d[y] <= (y==0) ? vld : ssa_d[y-1];
+    end
+  end:gen_ssa
+  assign ssa = ssa_d[Y_DIM-1];
+
+  always_ff @(posedge clk) begin:ff_ctrl
+    if (!rstn) begin:rst
+      nptr[0] <= '0;
+      rptr[0] <= WM_ROWS-1;
+    end:rst
+    else begin:nrst
+      nptr[0] <= nptr_n;
+      rptr[0] <= rptr_n;
+    end:nrst
+  end:ff_ctrl
+
+  always_comb begin:cb_ctrl
+    rptr_n = (vld) ? rptr[0] - 'd1 : rptr[0];
+    nptr_n = nptr[0];
+
+    if (rptr[0] == 0) begin
+      rptr_n = (WM_ROWS-1);
+      nptr_n = nptr[0] + 'd1;
+    end
+  end:cb_ctrl
+
+  assign ext_w[0].v_n = vld;
+  assign ext_w[0].d_n = gen_weights[nptr[0]][0][rptr[0]];
+  assign ext_w[0].c_n = (ext_w[0].v_n) ? rptr[0] : 'x;
+  for (genvar x=1; x<X_DIM; x++) begin
+    always_ff @(posedge clk) begin
+      nptr[x] <= nptr[x-1];
+      rptr[x] <= rptr[x-1];
+      ext_w[x].v_n <= ext_w[x-1].v_n;
+      ext_w[x].c_n <= ext_w[x-1].c_n;
+    end
+    assign ext_w[x].d_n = gen_weights[nptr[x]][x][rptr[x]];
+  end
+
+  // let's cheat, we'll store weights to controller memory first
+  // non-synthesizable, need to replace
+  initial begin:init_weights
+    logic [DAT_W-1:0] wval;
+    for (int n=0; n<NUM_W_MATRICES; n++) begin:gn
+      wval = 'd1;
+      for (int r=0; r<WM_ROWS; r++) begin:gr
+        for (int c=0; c<WM_COLS; c++) begin:gc
+          gen_weights[n][c][r] = wval;
+          wval = wval + 'd1; //FIXME: will overflow if loop iters not controlled
+        end:gc
+      end:gr
+    end:gn
+  end:init_weights
+
+endmodule
