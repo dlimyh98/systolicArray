@@ -10,16 +10,18 @@ module ip_pe #(
   input rstn
 );
 
-  always_ff @(posedge clk) begin:ff_wgt_ctrl
+  always_ff @(posedge clk) begin:ff_wgt
     if (!rstn) begin:rst
       wgt.c_s <= '1;
       wgt.v_s <= '0;
+      wgt.d_s <= 'x;
     end:rst
     else begin:nrst
       wgt.c_s <= (wgt.v_n) ? (wgt.c_n - 'd1) : wgt.c_n; //FIXME: underflow edge
       wgt.v_s <= wgt.v_n;
+      wgt.d_s <= wgt.d_n;
     end:nrst
-  end:ff_wgt_ctrl
+  end:ff_wgt
 
   always_ff @(posedge clk) begin:ff_act
     if (!rstn) begin
@@ -53,11 +55,18 @@ module ip_pe #(
   end:cb_pp_ctrl
 
   always_ff @(posedge clk) begin:ff_compute
-    if (!rstn) cmp.psum_s <= '0;
+    if (!rstn) {cmp.psum_s, cmp.psum_v} <= '0;
     else begin:nrst
-      /* verilator lint_off WIDTHEXPAND */
-      if (act.v_w) cmp.psum_s <= (act.d_w * ppbuf[rptr]) + cmp.carr_n;
-      /* verilator lint_on WIDTHEXPAND */
+      if (act.v_w) begin
+        /* verilator lint_off WIDTHEXPAND */
+        cmp.psum_s <= (act.d_w * ppbuf[rptr]) + cmp.carr_n; // might not close timing
+        /* verilator lint_on WIDTHEXPAND */
+        cmp.psum_v <= '1;
+      end
+      else begin
+        cmp.psum_s <= 'x;
+        cmp.psum_v <= '0;
+      end
     end:nrst
   end:ff_compute
 

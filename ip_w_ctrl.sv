@@ -22,9 +22,33 @@ module ip_w_ctrl #(
   logic [$clog2(NUM_W_MATRICES)-1:0] nptr [0:X_DIM-1], nptr_n;
   logic [$clog2(WM_ROWS)-1:0] rptr [0:X_DIM-1], rptr_n; // row pointer
 
-  //FIXME: don't like this, has to be better way
-  logic vld;
-  always_ff @(posedge clk) vld <= rstn;
+  typedef enum logic [1:0] {
+    S_I, // idle
+    S_A, // active
+    S_D, // done
+    S_X  // invalid
+  } wfsm_t;
+  wfsm_t wfsm, wfsm_n;
+
+  always_ff @(posedge clk) begin:ff_wfsm
+    if (!rstn) wfsm <= S_I;
+    else       wfsm <= wfsm_n;
+  end:ff_wfsm
+
+  always_comb begin:cb_wfsm
+    wfsm_n = wfsm;
+    case (wfsm)
+      S_I : wfsm_n = (rstn) ? S_A : S_I; // activated out of reset
+      /*verilator lint_off WIDTHEXPAND */
+      S_A : wfsm_n = ((nptr[0] == NUM_W_MATRICES-1) && rptr[0] == '0) ? S_D : S_A;
+      /*verilator lint_on WIDTHEXPAND */
+      S_D : wfsm_n = S_D;
+      default: wfsm_n = S_X;
+    endcase
+  end:cb_wfsm
+
+  logic is_active;
+  assign is_active = (wfsm == S_A);
 
   // signal to ip_a_ctrl to begin streaming activation data
   // the latency is a function of the systolic array's Y_DIM
@@ -32,7 +56,7 @@ module ip_w_ctrl #(
   for (genvar y=0; y<Y_DIM; y++) begin:gen_ssa
     always_ff @(posedge clk) begin
       if (!rstn) ssa_d[y] <= '0;
-      else       ssa_d[y] <= (y==0) ? vld : ssa_d[y-1];
+      else       ssa_d[y] <= (y==0) ? is_active : ssa_d[y-1];
     end
   end:gen_ssa
   assign ssa = ssa_d[Y_DIM-1];
@@ -49,7 +73,7 @@ module ip_w_ctrl #(
   end:ff_ctrl
 
   always_comb begin:cb_ctrl
-    rptr_n = (vld) ? rptr[0] - 'd1 : rptr[0];
+    rptr_n = (is_active) ? rptr[0] - 'd1 : rptr[0];
     nptr_n = nptr[0];
 
     if (rptr[0] == 0) begin
@@ -58,7 +82,7 @@ module ip_w_ctrl #(
     end
   end:cb_ctrl
 
-  assign ext_w[0].v_n = vld;
+  assign ext_w[0].v_n = is_active;
   assign ext_w[0].d_n = gen_weights[nptr[0]][0][rptr[0]];
   assign ext_w[0].c_n = (ext_w[0].v_n) ? rptr[0] : 'x;
   for (genvar x=1; x<X_DIM; x++) begin

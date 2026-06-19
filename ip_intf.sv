@@ -12,7 +12,6 @@ interface weight_if #(
               output v_s, c_s, d_s);
 
   modport ct (output v_n, c_n, d_n);
-
 endinterface //weight_if
 
 interface activation_if #(
@@ -35,7 +34,8 @@ interface compute_if #(
   logic [CARR_W-1:0] carr_n;
   /* verilator lint_on ASCRANGE */
   logic [PSUM_W-1:0] psum_s;
+  logic psum_v; // psum valid
 
   modport pe (input carr_n,
-              output psum_s);
+              output psum_s, psum_v);
 endinterface //compute_if
