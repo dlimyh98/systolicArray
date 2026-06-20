@@ -64,7 +64,7 @@ module ip_a_ctrl #(
     rptr_n = (is_active) ? rptr[0] + 'd1 : rptr[0];
     nptr_n = nptr[0];
 
-    if (rptr[0] == rptr_t'(AM_ROWS-1)) begin:row_done
+    if (rptr[0] == rptr_t'(AM_ROWS-1) && is_active) begin:row_done
       rptr_n = '0;
       nptr_n = nptr[0] + 'd1;
     end:row_done

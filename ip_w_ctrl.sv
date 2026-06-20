@@ -64,7 +64,10 @@ module ip_w_ctrl #(
       else       ssa_d[y] <= (y==0) ? is_active : ssa_d[y-1];
     end
   end:gen_ssa
-  assign ssa = ssa_d[Y_DIM-2] & !ssa_d[Y_DIM-1];
+  generate
+    if (Y_DIM > 1) assign ssa = (ssa_d[Y_DIM-2] & !ssa_d[Y_DIM-1]);
+    else           assign ssa = ssa_d;
+  endgenerate
 
   always_ff @(posedge clk) begin:ff_ctrl
     if (!rstn) begin:rst
@@ -81,7 +84,7 @@ module ip_w_ctrl #(
     rptr_n = (is_active) ? rptr[0] - 'd1 : rptr[0];
     nptr_n = nptr[0];
 
-    if (rptr[0] == 0) begin
+    if (rptr[0] == 0 && is_active) begin
       rptr_n = rptr_t'(WM_ROWS-1);
       nptr_n = nptr[0] + 'd1;
     end

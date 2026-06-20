@@ -39,7 +39,7 @@ module ip_pe #(
   // - buffer handling is tricky, problem is with the southmost layer's PE (worst-case)
   // - along Y_DIM, all PEs load their weights at the same time, but
   //   the activation data does not reach all PEs similarly (due to systolic nature)
-  // - the northmost PE gets activation data first, ie. the more southerly your PE
+  // - the northmost PE gets activation data first; ie. the more southerly your PE
   //   is located, the more buffering is required
   localparam RPTR_W = (WBUF_SZE > 1) ? $clog2(WBUF_SZE) : 1;
   typedef logic [RPTR_W-1:0] ptr_t;

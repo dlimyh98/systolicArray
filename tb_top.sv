@@ -1,24 +1,58 @@
 // vim: set ts=2 sw=2 et :
 
+// verification for A*W systolic-array matmul
+
 module tb_top;
 
-  // test square matrix (3x3)
-  // test nonsquare matrix (eg. 2x3 x 3x1)
+  //TODO: 3x3 desired by tetramem (DAT_W = 4)
 
+  //TODO: 3x3 matmul 3x1
+  //TODO: 6x1 matmul 1x6
+  //TODO: 2x2 matmul 2x4
+
+  //TODO: 1x3 matmul 3x2
+
+  // FAILING: 2x3 matmul 3x1
+  // worse: 2x4 matmul 4x1
+
+  // not supported (AM_ROWS < Y_DIM)
+  // this requires data forwarding, or some kind of stall at the activation streaming side
+  // the weight values cannot be loaded with the current architecture
+  // intuitively, we need to spend more time streaming the B values for one matrix, rather than A
+  // therefore the A value can stream in before we are ready for it
+
+  // FIXME: or can it? what if we delay the a matrix loading??
+
+  // it's actually the inverse problem of AM_ROWS > Y_DIM
+
+
+  // ----------------- PARAMETERS ----------------- //
   // activation matrix dimensions
-  parameter AM_ROWS = 3;
+  parameter AM_ROWS = 2;
   parameter AM_COLS = 3;
+  parameter AM_NUM  = 3;
   // weight matrix dimensions
   localparam WM_ROWS = AM_COLS;
-  parameter WM_COLS = 3;
+  parameter WM_COLS = 1;
+  localparam WM_NUM = AM_NUM; // assume no broadcast feature (ie. one A to many W)
   // systolic array dimensions
   localparam Y_DIM = AM_COLS;
   localparam X_DIM = WM_COLS;
+  // result matrix dimensions
+  localparam RM_ROWS = AM_ROWS;
+  localparam RM_COLS = WM_COLS;
+  localparam RM_NUM  = AM_NUM;
 
-  parameter DAT_W = 4;
-  weight_if     #( .DAT_W, .CRD_N($clog2(Y_DIM)) ) if_w [0:X_DIM-1] ();
-  activation_if #( .DAT_W                        ) if_a [0:Y_DIM-1] ();
+  parameter DAT_W = 6;
+  localparam CRD_N = (Y_DIM > 1) ? $clog2(Y_DIM) : 1;
+  localparam MAX_PSUM_W = (DAT_W*2) + (Y_DIM-1);
 
+  // ----------------- INTERFACES ----------------- //
+  weight_if     #( .DAT_W, .CRD_N     ) if_w [0:X_DIM-1] ();
+  activation_if #( .DAT_W             ) if_a [0:Y_DIM-1] ();
+  result_if     #( .DAT_W(MAX_PSUM_W) ) if_r [0:X_DIM-1] ();
+
+  // ----------------- DUT ----------------- //
   logic clk;
   logic rstn; // assume sync
 
@@ -26,6 +60,7 @@ module tb_top;
   ip_a_ctrl #(
     .AM_ROWS,
     .AM_COLS,
+    .AM_NUM,
     .ZZZ (0)
   ) i_a_ctrl (
     .ext_a ( if_a ),
@@ -36,6 +71,7 @@ module tb_top;
   ip_w_ctrl #(
     .WM_ROWS,
     .WM_COLS,
+    .WM_NUM,
     .Y_DIM,
     .ZZZ (0)
   ) i_w_ctrl (
@@ -44,16 +80,63 @@ module tb_top;
     .ssa
   );
 
+  wire ares_v;
+  wire [MAX_PSUM_W-1:0] ares_d [0:RM_COLS-1][0:RM_ROWS-1];
+  ip_r_ctrl #(
+    .RM_ROWS,
+    .RM_COLS,
+    .RM_NUM,
+    .ZZZ (0)
+  ) i_r_ctrl (
+    .sres   ( if_r ),
+    .ares_v,
+    .ares_d,
+    .clk, .rstn
+  );
+
   ip_sysarr #(
+    .AM_ROWS,
     .X_DIM,
     .Y_DIM,
     .ZZZ (0)
   ) i_sysarr (
     .ext_w ( if_w ),
     .ext_a ( if_a ),
+    .ext_r ( if_r ),
     .clk, .rstn
   );
 
+  // ----------------- SCOREBOARD ----------------- //
+  logic [MAX_PSUM_W-1:0] sbrd [0:RM_COLS-1][0:RM_ROWS-1];
+
+  initial begin:sbrd_checker
+    int n = 0;
+    do begin
+      @(negedge clk); //FIXME: inefficient to poll on every negedge, but it works
+
+      // NB: ares_v possible to be asserted b2b (edge case of 1x1 systolic array)
+      if (ares_v) begin:av
+        // compute scoreboard
+        for (int rc=0; rc<RM_COLS; rc++) begin:grc
+          for (int rr=0; rr<RM_ROWS; rr++) begin:grr
+            sbrd[rc][rr] = '0;
+            for (int ac=0; ac<AM_COLS; ac++)
+              sbrd[rc][rr] += i_a_ctrl.gen_activation[n][ac][rr] *
+                              i_w_ctrl.gen_weights[n][rc][ac];
+          end:grr
+        end:grc
+        // do comparison
+        assert(sbrd === ares_d) else $warning("FAIL: mismatch at n=%0d", n);
+        n++;
+      end:av
+    end while (n < 2); //FIXME
+
+    repeat(5) @(negedge clk);
+    $display("PASS\n");
+    $finish(); //FIXME: timeout support, sim will hang if RTL doesn't iterate thru all n
+  end:sbrd_checker
+
+  // ----------------- VERIF ARTIFACTS ----------------- //
   initial begin
     $dumpfile("wave.vcd");
     $dumpvars(0, tb_top);
@@ -64,8 +147,6 @@ module tb_top;
     rstn = '0;
     repeat(10) @(negedge clk);
     rstn = '1;
-    repeat(20) @(negedge clk);
-    $finish;
   end
 
   always #(10) clk = ~clk;

@@ -69,10 +69,12 @@ module ip_r_ctrl #(
   end:gen_memc
   assign ares_d[RM_COLS-1][RM_ROWS-1] = mem[RM_COLS-1][RM_ROWS-1];
 
-  // output valid when an arbitrary matmul is completed
+  // aggregated output valid when an arbitrary matmul is completed, which
+  // occurs when last element of bottom right (south-east) PE is streamed out
   always_ff @(posedge clk) begin
     if (!rstn) ares_v <= '0;
-    else       ares_v <= (rptr[RM_COLS-1] == rptr_t'(RM_ROWS-1));
+    else       ares_v <= (RM_ROWS > 1) ? (rptr[RM_COLS-1] == rptr_t'(RM_ROWS-1))
+                                       : sres[RM_COLS-1].v;
   end
 
 endmodule
