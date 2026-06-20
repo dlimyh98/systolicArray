@@ -1,4 +1,4 @@
-COMPILE_CMD := verilator --quiet --binary --trace -f filelist.f --top-module tb_top
+COMPILE_CMD := verilator --quiet --binary --trace -F design/design.f -F verif/verif.f --top-module tb_top
 SIM_CMD = ./obj_dir/Vtb_top
 
 # NB: sweep test requires RTL's DAT_W parameter to be sufficiently large,

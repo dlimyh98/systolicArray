@@ -4,4 +4,3 @@ ip_a_ctrl.sv
 ip_r_ctrl.sv
 ip_pe.sv
 ip_sysarr.sv
-tb_top.sv
