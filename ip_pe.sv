@@ -41,7 +41,6 @@ module ip_pe #(
   //   the activation data does not reach all PEs similarly (due to systolic nature)
   // - the northmost PE gets activation data first, ie. the more southerly your PE
   //   is located, the more buffering is required
-
   localparam RPTR_W = (WBUF_SZE > 1) ? $clog2(WBUF_SZE) : 1;
   typedef logic [RPTR_W-1:0] ptr_t;
   typedef logic [$clog2(AM_ROWS):0] cntr_t;
