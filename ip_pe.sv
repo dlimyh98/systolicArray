@@ -44,7 +44,7 @@ module ip_pe #(
 
   localparam RPTR_W = (WBUF_SZE > 1) ? $clog2(WBUF_SZE) : 1;
   typedef logic [RPTR_W-1:0] ptr_t;
-  typedef logic [$clog2(AM_ROWS)-1:0] cntr_t;
+  typedef logic [$clog2(AM_ROWS):0] cntr_t;
 
   ptr_t wptr, rptr;
   cntr_t cntr;
@@ -73,7 +73,7 @@ module ip_pe #(
       if (act.v_w) begin:av
         if (cntr + 'd1 == cntr_t'(AM_ROWS)) begin:astrm_done
           cntr <= '0;
-          rptr <= rptr + 'd1;
+          rptr <= ( rptr+'d1 == ptr_t'(WBUF_SZE) ) ? '0 : (rptr + 'd1);
         end:astrm_done
         else begin:astrm_ndone
           cntr <= cntr + 'd1;

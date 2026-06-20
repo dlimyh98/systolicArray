@@ -105,7 +105,7 @@ module ip_w_ctrl #(
   initial begin:init_weights
     logic [DAT_W-1:0] wval;
     for (int n=0; n<WM_NUM; n++) begin:gn
-      wval = (n==0) ? 'd22 : 'd2;
+      wval = (n==0 || n==2) ? 'd22 : 'd2;
       for (int r=0; r<WM_ROWS; r++) begin:gr
         for (int c=0; c<WM_COLS; c++) begin:gc
           gen_weights[n][c][r] = wval;
