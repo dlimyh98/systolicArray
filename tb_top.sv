@@ -4,36 +4,20 @@
 
 module tb_top;
 
-  //TODO: 3x3 desired by tetramem (DAT_W = 4)
-
-  //TODO: 3x3 matmul 3x1
-  //TODO: 6x1 matmul 1x6
-  //TODO: 2x2 matmul 2x4
-
-  //TODO: 1x3 matmul 3x2
-
-  // FAILING: 2x3 matmul 3x1
-  // worse: 2x4 matmul 4x1
-
-  // not supported (AM_ROWS < Y_DIM)
-  // this requires data forwarding, or some kind of stall at the activation streaming side
-  // the weight values cannot be loaded with the current architecture
-  // intuitively, we need to spend more time streaming the B values for one matrix, rather than A
-  // therefore the A value can stream in before we are ready for it
-
-  // FIXME: or can it? what if we delay the a matrix loading??
-
-  // it's actually the inverse problem of AM_ROWS > Y_DIM
-
+  // - currently (AM_ROWS < Y_DIM) is not supported
+  // - eg. failing testcase = (2x3) matmul (3x1)
+  //       worse failure is (2x4) matmul (4x1)
+  // - currently looking into adding abuf in PE to solve this
+  // - plausible alternative is changing A/W stream scheduling
 
   // ----------------- PARAMETERS ----------------- //
   // activation matrix dimensions
-  parameter AM_ROWS = 2;
+  parameter AM_ROWS = 3;
   parameter AM_COLS = 3;
   parameter AM_NUM  = 3;
   // weight matrix dimensions
   localparam WM_ROWS = AM_COLS;
-  parameter WM_COLS = 1;
+  parameter WM_COLS = 3;
   localparam WM_NUM = AM_NUM; // assume no broadcast feature (ie. one A to many W)
   // systolic array dimensions
   localparam Y_DIM = AM_COLS;
@@ -126,10 +110,10 @@ module tb_top;
           end:grr
         end:grc
         // do comparison
-        assert(sbrd === ares_d) else $warning("FAIL: mismatch at n=%0d", n);
+        assert(sbrd === ares_d) else $fatal("FAIL: mismatch at n=%0d", n);
         n++;
       end:av
-    end while (n < 2); //FIXME
+    end while (n < AM_NUM);
 
     repeat(5) @(negedge clk);
     $display("PASS\n");

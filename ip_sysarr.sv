@@ -72,7 +72,13 @@ module ip_sysarr #(
         assign grd_p_carr_n[x][y+1] = c.psum_s;
         /* verilator lint_on WIDTHEXPAND */
 
-        localparam WBUF_SZE = (AM_ROWS - Y_DIM) + (y) + 1;
+        // 1.  (AM_ROWS > Y_DIM) - W inflow higher than A inflow, buffer depth is furthur increased to account for it
+        // 2a. (AM_ROWS == Y_DIM) && (Y_DIM > 1) - W inflow matches A inflow, buffer depth is function of Y_DIM only
+        // 2b. (AM_ROWS == Y_DIM) && (Y_DIM = 1) - degenerate systolic array, just single PE requiring double buffering
+        // 3.  (AM_ROWS < Y_DIM) - not supported yet. 0 is just placeholder value
+        localparam WBUF_SZE = (AM_ROWS > Y_DIM) ? (AM_ROWS - Y_DIM) + (y+1) :
+                              (AM_ROWS == Y_DIM) ? (Y_DIM==1) ? 2 : (y+1) : 0;
+
         ip_pe #(
           .AM_ROWS,
           .WBUF_SZE,
