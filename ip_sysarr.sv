@@ -1,19 +1,22 @@
 // vim: set ts=2 sw=2 et :
 
 module ip_sysarr #(
+  parameter AM_ROWS,
   parameter X_DIM,
   parameter Y_DIM,
   parameter ZZZ = 0
 ) (
   weight_if.pe      ext_w[0:X_DIM-1],
   activation_if.pe  ext_a[0:Y_DIM-1],
+  result_if.sar     ext_r[0:X_DIM-1],
   input clk, rstn
 );
   localparam DAT_W = ext_w[0].DAT_W;
   localparam CRD_N = ext_w[0].CRD_N;
+  localparam MAX_PSUM_W = ext_r[0].DAT_W;
 
-  //NB: dimensions [XDIM][Y_DIM] of interconnects are unused. they
-  //are added to work around a vrltr issue with oob-driver, under gy_int/gx_int loop
+  // NB: dimensions [XDIM][Y_DIM] of interconnects are unused. they
+  // are added to work around a vrltr issue with oob-driver, under gy_int/gx_int loop
 
   // weight {d,c,v} interconnect
   wire [DAT_W-1:0] grd_w_d [0:X_DIM][0:Y_DIM];
@@ -25,7 +28,7 @@ module ip_sysarr #(
   wire             grd_a_v [0:X_DIM][0:Y_DIM];
 
   // comp interconnect
-  localparam MAX_PSUM_W = (DAT_W*2) + (Y_DIM-1);
+  // z-index is larger than required (MAX_PSUM_W), to work around vrltr issue
   wire [MAX_PSUM_W-1:0] grd_p_carr_n [0:X_DIM][0:Y_DIM];
 
   genvar x,y;
@@ -69,7 +72,10 @@ module ip_sysarr #(
         assign grd_p_carr_n[x][y+1] = c.psum_s;
         /* verilator lint_on WIDTHEXPAND */
 
+        localparam WBUF_SZE = (AM_ROWS - Y_DIM) + (y) + 1;
         ip_pe #(
+          .AM_ROWS,
+          .WBUF_SZE,
           .ZZZ (0)
         ) i_pe (
           .wgt ( w ),
@@ -77,6 +83,10 @@ module ip_sysarr #(
           .cmp ( c ),
           .clk, .rstn
         );
+        if (y == Y_DIM-1) begin:sysarr_out
+          assign ext_r[x].v = c.psum_v;
+          assign ext_r[x].d = c.psum_s;
+        end:sysarr_out
       end:gx_int
     end:gy_int
   endgenerate

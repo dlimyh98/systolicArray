@@ -3,6 +3,7 @@
 module ip_a_ctrl #(
   parameter AM_ROWS,
   parameter AM_COLS,
+  parameter AM_NUM,
   localparam Y_DIM = AM_COLS,
   parameter ZZZ    = 0
 ) (
@@ -13,22 +14,41 @@ module ip_a_ctrl #(
 );
 
   localparam DAT_W = ext_a[0].DAT_W;
-  localparam NUM_A_MATRICES = 2;
-  logic [DAT_W-1:0] gen_activation [0:NUM_A_MATRICES-1][0:AM_COLS-1][0:AM_ROWS-1];
+  logic [DAT_W-1:0] gen_activation [0:AM_NUM-1][0:AM_COLS-1][0:AM_ROWS-1];
 
   // pointers across Y_DIM of systolic array (activation travels west-east)
   // each pointer holds reference to value(s) of the activation matrix
-  localparam NPTR_W = (NUM_A_MATRICES > 1) ? $clog2(NUM_A_MATRICES) : 1;
+  localparam NPTR_W = (AM_NUM > 1) ? $clog2(AM_NUM) : 1;
   localparam RPTR_W = (AM_ROWS > 1) ? $clog2(AM_ROWS) : 1;
   typedef logic [NPTR_W-1:0] nptr_t;
   typedef logic [RPTR_W-1:0] rptr_t;
   nptr_t nptr [0:Y_DIM-1], nptr_n;
   rptr_t rptr [0:Y_DIM-1], rptr_n; // row pointer
 
-  // ext_a[0], increment along the matrix 0th column (top-down)
-  // ext_a[1], increment along the matrix 1st column (top-down)
+  typedef enum logic [1:0] {
+    S_I, // idle
+    S_A, // active
+    S_D, // done
+    S_X  // invalid
+  } afsm_t;
+  afsm_t afsm, afsm_n;
 
-  assign ext_a[0].d_w = gen_activation[nptr[0]][0][rptr[0]];
+  always_ff @(posedge clk) begin:ff_afsm
+    if (!rstn) afsm <= S_I;
+    else       afsm <= afsm_n;
+  end:ff_afsm
+
+  always_comb begin:cb_afsm
+    afsm_n = afsm;
+    case (afsm)
+      S_I : afsm_n = (ssa) ? S_A : S_I; // triggered via ip_w_ctrl
+      /*verilator lint_off WIDTHEXPAND */
+      S_A : afsm_n = ((nptr[0] == AM_NUM-1) && rptr[0] == AM_ROWS-1) ? S_D : S_A;
+      /*verilator lint_on WIDTHEXPAND */
+      S_D : afsm_n = S_D;
+      default: afsm_n = S_X;
+    endcase
+  end:cb_afsm
 
   always_ff @(posedge clk) begin:ff_ctrl
     if (!rstn) {nptr[0], rptr[0]} <= '0;
@@ -38,17 +58,19 @@ module ip_a_ctrl #(
     end:nrst
   end:ff_ctrl
 
+  logic is_active;
+  assign is_active = (afsm == S_A);
   always_comb begin:cb_ctrl
-    rptr_n = (ssa) ? rptr[0] + 'd1 : rptr[0];
+    rptr_n = (is_active) ? rptr[0] + 'd1 : rptr[0];
     nptr_n = nptr[0];
 
-    if (rptr[0] == rptr_t'(AM_ROWS-1)) begin
+    if (rptr[0] == rptr_t'(AM_ROWS-1)) begin:row_done
       rptr_n = '0;
       nptr_n = nptr[0] + 'd1;
-    end
+    end:row_done
   end:cb_ctrl
 
-  assign ext_a[0].v_w = ssa;
+  assign ext_a[0].v_w = is_active;
   assign ext_a[0].d_w = gen_activation[nptr[0]][0][rptr[0]];
   for (genvar y=1; y<Y_DIM; y++) begin
     always_ff @(posedge clk) begin
@@ -63,8 +85,8 @@ module ip_a_ctrl #(
   // non-synthesizable, need to replace
   initial begin:init_activations
     logic [DAT_W-1:0] aval;
-    for (int n=0; n<NUM_A_MATRICES; n++) begin:gn
-      aval = 'd12;
+    for (int n=0; n<AM_NUM; n++) begin:gn
+      aval = (n==0) ? 'd12 : 'd1;
       for (int r=0; r<AM_ROWS; r++) begin:gr
         for (int c=0; c<AM_COLS; c++) begin:gc
           gen_activation[n][c][r] = aval;

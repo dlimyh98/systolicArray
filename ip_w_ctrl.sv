@@ -3,6 +3,7 @@
 module ip_w_ctrl #(
   parameter WM_ROWS,
   parameter WM_COLS,
+  parameter WM_NUM,
   parameter Y_DIM,
   localparam X_DIM = WM_COLS,
   parameter ZZZ    = 0
@@ -14,12 +15,11 @@ module ip_w_ctrl #(
 );
 
   localparam DAT_W = ext_w[0].DAT_W;
-  localparam NUM_W_MATRICES = 2;
-  logic [DAT_W-1:0] gen_weights [0:NUM_W_MATRICES-1][0:WM_COLS-1][0:WM_ROWS-1];
+  logic [DAT_W-1:0] gen_weights [0:WM_NUM-1][0:WM_COLS-1][0:WM_ROWS-1];
 
   // pointers across X_DIM of systolic array (weights travel north-south)
   // each pointer holds reference to value(s) of the weight matrix
-  localparam NPTR_W = (NUM_W_MATRICES > 1) ? $clog2(NUM_W_MATRICES) : 1;
+  localparam NPTR_W = (WM_NUM > 1) ? $clog2(WM_NUM) : 1;
   localparam RPTR_W = (WM_ROWS > 1) ? $clog2(WM_ROWS) : 1;
   typedef logic [NPTR_W-1:0] nptr_t;
   typedef logic [RPTR_W-1:0] rptr_t;
@@ -45,7 +45,7 @@ module ip_w_ctrl #(
     case (wfsm)
       S_I : wfsm_n = (rstn) ? S_A : S_I; // activated out of reset
       /*verilator lint_off WIDTHEXPAND */
-      S_A : wfsm_n = ((nptr[0] == NUM_W_MATRICES-1) && rptr[0] == '0) ? S_D : S_A;
+      S_A : wfsm_n = ((nptr[0] == WM_NUM-1) && rptr[0] == '0) ? S_D : S_A;
       /*verilator lint_on WIDTHEXPAND */
       S_D : wfsm_n = S_D;
       default: wfsm_n = S_X;
@@ -55,7 +55,7 @@ module ip_w_ctrl #(
   logic is_active;
   assign is_active = (wfsm == S_A);
 
-  // signal to ip_a_ctrl to begin streaming activation data
+  // pulse to ip_a_ctrl to begin streaming activation data
   // the latency is a function of the systolic array's Y_DIM
   logic [Y_DIM-1:0] ssa_d;
   for (genvar y=0; y<Y_DIM; y++) begin:gen_ssa
@@ -64,7 +64,7 @@ module ip_w_ctrl #(
       else       ssa_d[y] <= (y==0) ? is_active : ssa_d[y-1];
     end
   end:gen_ssa
-  assign ssa = ssa_d[Y_DIM-1];
+  assign ssa = ssa_d[Y_DIM-2] & !ssa_d[Y_DIM-1];
 
   always_ff @(posedge clk) begin:ff_ctrl
     if (!rstn) begin:rst
@@ -104,8 +104,8 @@ module ip_w_ctrl #(
   // non-synthesizable, need to replace
   initial begin:init_weights
     logic [DAT_W-1:0] wval;
-    for (int n=0; n<NUM_W_MATRICES; n++) begin:gn
-      wval = 'd22;
+    for (int n=0; n<WM_NUM; n++) begin:gn
+      wval = (n==0) ? 'd22 : 'd2;
       for (int r=0; r<WM_ROWS; r++) begin:gr
         for (int c=0; c<WM_COLS; c++) begin:gc
           gen_weights[n][c][r] = wval;

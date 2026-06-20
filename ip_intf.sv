@@ -26,6 +26,16 @@ interface activation_if #(
   modport ct (output v_w, d_w);
 endinterface //activation_if
 
+interface result_if #(
+  parameter DAT_W = 8
+) ();
+  logic v;
+  logic [DAT_W-1:0] d;
+
+  modport sar (output v, d);
+  modport mem (input v, d);
+endinterface //result_if
+
 interface compute_if #(
   parameter CARR_W = 8,
   parameter PSUM_W = 9
