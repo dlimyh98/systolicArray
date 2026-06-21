@@ -43,9 +43,12 @@ interface compute_if #(
   /* verilator lint_off ASCRANGE */
   logic [CARR_W-1:0] carr_n;
   /* verilator lint_on ASCRANGE */
-  logic [PSUM_W-1:0] psum_s;
-  logic psum_v; // psum valid
 
-  modport pe (input carr_n,
-              output psum_s, psum_v);
+  logic [PSUM_W-1:0] psum_s;
+  logic psum_v_s, psum_v_n;
+
+  logic s_n, s_s; // stall
+
+  modport pe (input carr_n, psum_v_n, s_n,
+              output psum_s, psum_v_s, s_s);
 endinterface //compute_if

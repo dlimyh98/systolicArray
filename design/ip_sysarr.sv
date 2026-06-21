@@ -30,6 +30,8 @@ module ip_sysarr #(
   // comp interconnect
   // z-index is larger than required (MAX_PSUM_W), to work around vrltr issue
   wire [MAX_PSUM_W-1:0] grd_p_carr_n [0:X_DIM][0:Y_DIM];
+  wire                  grd_p_v [0:X_DIM][0:Y_DIM];
+  wire                  grd_p_s [0:X_DIM][0:Y_DIM];
 
   genvar x,y;
   generate
@@ -43,6 +45,8 @@ module ip_sysarr #(
       assign grd_w_c[x][0] = ext_w[x].c_n;
       assign grd_w_v[x][0] = ext_w[x].v_n;
       assign grd_p_carr_n[x][0] = '0;
+      assign grd_p_v[x][0] = '1;
+      assign grd_p_s[x][0] = '0;
     end:gx_ext
 
     for (y=0; y<Y_DIM; y++) begin:gy_int
@@ -71,13 +75,19 @@ module ip_sysarr #(
         /* verilator lint_off WIDTHEXPAND */
         assign grd_p_carr_n[x][y+1] = c.psum_s;
         /* verilator lint_on WIDTHEXPAND */
+        assign c.psum_v_n = grd_p_v[x][y];
+        assign grd_p_v[x][y+1] = c.psum_v_s;
+        assign c.s_n = grd_p_s[x][y];
+        assign grd_p_s[x][y+1] = c.s_s;
+
+        //TODO: (2x3) mm (3x1), requires WBUF_SZE=2 to pass n=0
 
         // 1.  (AM_ROWS > Y_DIM) - W inflow higher than A inflow, buffer depth is furthur increased to account for it
         // 2a. (AM_ROWS == Y_DIM) && (Y_DIM > 1) - W inflow matches A inflow, buffer depth is function of Y_DIM only
         // 2b. (AM_ROWS == Y_DIM) && (Y_DIM = 1) - degenerate systolic array, just single PE requiring double buffering
         // 3.  (AM_ROWS < Y_DIM) - not supported yet. 0 is just placeholder value
         localparam WBUF_SZE = (AM_ROWS > Y_DIM) ? (AM_ROWS - Y_DIM) + (y+1) :
-                              (AM_ROWS == Y_DIM) ? (Y_DIM==1) ? 2 : (y+1) : 0;
+                              (AM_ROWS == Y_DIM) ? (Y_DIM==1) ? 2 : (y+1) : (y+1);
 
         ip_pe #(
           .AM_ROWS,
@@ -90,7 +100,7 @@ module ip_sysarr #(
           .clk, .rstn
         );
         if (y == Y_DIM-1) begin:sysarr_out
-          assign ext_r[x].v = c.psum_v;
+          assign ext_r[x].v = c.psum_v_s;
           assign ext_r[x].d = c.psum_s;
         end:sysarr_out
       end:gx_int

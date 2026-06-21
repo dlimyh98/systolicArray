@@ -1,5 +1,7 @@
-COMPILE_CMD := verilator --quiet --binary --trace -F design/design.f -F verif/verif.f --top-module tb_top
-SIM_CMD = ./obj_dir/Vtb_top
+COMPILE_CMD := verilator --quiet --binary --trace \
+							--x-assign unique --x-initial unique \
+							-F design/design.f -F verif/verif.f --top-module tb_top
+SIM_CMD = ./obj_dir/Vtb_top +verilator+rand+reset+2
 
 # NB: sweep test requires RTL's DAT_W parameter to be sufficiently large,
 # else matmul results cannot be adequately represented
